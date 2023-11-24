@@ -1,6 +1,6 @@
 ---
 title: "Data analysis"
-author: "Aoyue Bi, Daxing Xu"
+author: "Aoyue Bi"
 date: "`r Sys.Date()`"
 output: 
   html_document: # html_notebook, html_document

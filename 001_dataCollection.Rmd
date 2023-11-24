@@ -1,0 +1,114 @@
+---
+title: "Data analysis"
+author: "Aoyue Bi"
+date: "`r Sys.Date()`"
+output: 
+  html_document: # html_notebook, html_document
+    toc: true
+    toc_float:
+      toc_collapsed: true
+    toc_depth: 3
+    number_sections: true
+    theme: simplex # default, united, cerulean, journal, flatly, darkly, readable, spacelab, united, cosmo, lumen, paper, sandstone, simplex, and yeti
+    highlight: haddock # default, tango, pygments, kate, monochrome, espresso, zenburn, haddock, and breezedark
+    # bibliography: bibliography.json
+---
+
+# Human genome
+
+```{r setup, echo =T, message = T, warning = F}
+library(tidyverse)
+# library(RColorBrewer)
+# library(ggpubr)
+# library(egg)
+## eval 代码要不要运行
+## echo 代码要不要输出
+## include 图要不要输出
+## warning 警告要不要输出
+## message 默认Bin等信息要不要输出
+```
+
+## rename file name
+
+### step1
+
+```{r}
+### 建立哈希表
+dfhm <- tibble(commonName = c("human","chimpanzee","gorilla","orangutan"),
+               speciesName = c("homo_sapiens","pan_troglodytes","gorilla_gorilla","pongo_abelii"))
+
+### 数据处处理
+inputDir <- c("/Users/Aoyue/project_pos/human_ILS/001_data/001_genomeInfo")
+
+df <- dir(inputDir,full.names = T) %>% 
+  map(~{read_tsv(.x) %>% 
+  mutate(speciesName = str_split_fixed(basename(.x),"_sequence_report",2)[,1])
+  }) %>% 
+  bind_rows() %>% 
+  filter(str_detect(`RefSeq seq accession`,"NC")) %>% 
+  filter(!`Chromosome name` == "MT") %>%
+  ### 和哈希表连接
+  left_join(dfhm,by = c("speciesName"))
+  
+# write_tsv(df,"/Users/Aoyue/project_pos/human_ILS/001_data/002_filterfrom001/001_sequence_report.tsv")
+
+
+### 下面的代码太繁琐，弃用！！！以后尽量以文件夹为主，进行文件的整合
+# df_human <- read_tsv("/Users/Aoyue/project_pos/human_ILS/001_data/001_genomeInfo/homo_sapiens_sequence_report.tsv") %>% mutate(commonName = "human", speciesName = "")
+# 
+# df_chimpanzee <- read_tsv("/Users/Aoyue/project_pos/human_ILS/001_data/001_genomeInfo/pan_troglodytes_sequence_report.tsv")
+# 
+# df_gorilla <- read_tsv("/Users/Aoyue/project_pos/human_ILS/001_data/001_genomeInfo/gorilla_gorilla_sequence_report.tsv")
+# 
+# df_orangutan <- read_tsv("/Users/Aoyue/project_pos/human_ILS/001_data/001_genomeInfo/pongo_abelii_sequence_report.tsv")
+# 
+# df <- df_human %>% bind_rows(df_chimpanzee,df_gorilla,df_orangutan) %>% 
+#   filter(str_detect(`RefSeq seq accession`,"NC"))
+# 
+# # write_tsv(df,"/Users/Aoyue/project_pos/human_ILS/001_data/002_filterfrom001/001_sequence_report.tsv")
+
+```
+
+### step2 rename shell
+
+```{r}
+dfcmd <- df %>% 
+  mutate(CMD = str_c("mv ",commonName,".part_",`RefSeq seq accession`,".fa ", commonName,"_chr",`Chromosome name`,".fa")) %>% 
+  select(CMD) %>% 
+  write_tsv(.,path = "~/Documents/sh.sh",col_names = F)
+
+```
+
+## script test 4 lastz
+
+```{bash}
+date && echo ' lastz for human of chr21 begins\n'
+
+lastz human_chr21.fa chimpanzee_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --format=axt --ambiguous=iupac > hg38_21_vs_chim_21.maf
+
+lastz human_chr21.fa gorilla_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --format=axt --ambiguous=iupac > hg38_21_vs_gori_21.maf
+
+lastz human_chr21.fa orangutan_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --format=axt --ambiguous=iupac > hg38_21_vs_oran_21.maf
+
+date && echo ' lastz for human of chr21 ends \n'
+
+
+lastz human_chr21.fa chimpanzee_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --scores=birdMatrix --format=axt > hg38_21_vs_chim_21.maf
+
+
+```
+
+```{r}
+## 先进行黑猩猩与大猩猩的lastz比对
+### --step=
+
+lastz human_chr21.fa chimpanzee_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --scores=birdMatrix --format=axt > hg38_21_vs_chim_21.maf
+
+lastz human_chr21.fa chimpanzee_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --scores=birdMatrix --format=axt > hg38_21_vs_chim_21.maf
+
+
+–minScore=5000, -linearGap=loose
+
+
+  
+```
