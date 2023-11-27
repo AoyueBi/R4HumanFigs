@@ -81,34 +81,124 @@ dfcmd <- df %>%
 
 ## script test 4 lastz
 
-```{bash}
+```{bash eval=FALSE, include=TRUE}
 date && echo ' lastz for human of chr21 begins\n'
 
-lastz human_chr21.fa chimpanzee_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --format=axt --ambiguous=iupac > hg38_21_vs_chim_21.maf
+lastz human_chr21.fa chimpanzee_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --format=axt --ambiguous=iupac > hg38_21_vs_chim_21.axt
 
-lastz human_chr21.fa gorilla_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --format=axt --ambiguous=iupac > hg38_21_vs_gori_21.maf
+lastz human_chr21.fa gorilla_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --format=axt --ambiguous=iupac > hg38_21_vs_gori_21.axt
 
-lastz human_chr21.fa orangutan_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --format=axt --ambiguous=iupac > hg38_21_vs_oran_21.maf
+lastz human_chr21.fa orangutan_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --format=axt --ambiguous=iupac > hg38_21_vs_oran_21.axt
 
 date && echo ' lastz for human of chr21 ends \n'
 
 
-lastz human_chr21.fa chimpanzee_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --scores=birdMatrix --format=axt > hg38_21_vs_chim_21.maf
-
-
 ```
 
-```{r}
-## 先进行黑猩猩与大猩猩的lastz比对
-### --step=
+## script test 4 axtChain
+```{bash eval=FALSE, include=TRUE}
+### 
 
-lastz human_chr21.fa chimpanzee_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --scores=birdMatrix --format=axt > hg38_21_vs_chim_21.maf
+date && echo ' axtChain for human of chr21 begins\n'
 
-lastz human_chr21.fa chimpanzee_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --scores=birdMatrix --format=axt > hg38_21_vs_chim_21.maf
+axtChain -minScore=5000 -linearGap=loose hg38_21_vs_chim_21.axt -faT ../human_chr21.fa -faQ ../chimpanzee_chr21.fa  hg38_21_vs_chim_21.chain
 
+axtChain -minScore=5000 -linearGap=loose hg38_21_vs_gori_21.axt -faT ../human_chr21.fa -faQ ../gorilla_chr21.fa  hg38_21_vs_gori_21.chain
 
-–minScore=5000, -linearGap=loose
+axtChain -minScore=5000 -linearGap=loose hg38_21_vs_oran_21.axt -faT ../human_chr21.fa -faQ ../orangutan_chr21.fa  hg38_21_vs_oran_21.chain
 
-
+date && echo ' axtChain for human of chr21 ends \n'
   
 ```
+
+## script test 4 Net
+```{bash eval=FALSE, include=TRUE}
+### chainPreNet all.chain ref.size query.size all.sort.chain
+### chainNet -rescore all.sort.chain ref.size query.size ref.prenet query.prenet -faT ref.fa -faQ query.fa -linearGap=loose 
+### netSyntenic  ref.prenet ref.net
+
+### NetFilterNonNested.perl -doScoreFilter -minScore1 50000 -keepSynNetsWithScore 5000 -keepInvNetsWithScore 5000 ca-di.ca.net > ca-di.ca.filter.net
+
+
+date && echo ' chainPreNet for human of chr21 begins\n'
+
+chainPreNet hg38_21_vs_chim_21.chain 46709983 49003045 hg38_21_vs_chim_21.sort.chain
+
+date && echo ' axtChain for human of chr21 ends \n'
+
+```
+
+## script test 4 maf 
+```{bash eval=FALSE, include=TRUE}
+
+### netToAxt ref.net 
+
+
+### axtSort
+
+
+### axtToMaf
+
+
+
+```
+
+### script test 4 MAF
+```{bash eval=FALSE, include=TRUE}
+
+### multiz M=1 
+```
+
+
+## from long zhou
+```{bash eval=FALSE, include=TRUE}
+for i in `seq 1 22` X Y; do mkdir chr$i; echo "/slurm/users/zhouyang/software/kentUtils/faToTwoBit /slurm/users/zhouyang/project/human_T2T/05.assembly_comparison/00.data/MF2_combine.v0.6.split/chr$i.fasta `pwd`/chr$i/target.2bit && /slurm/users/zhouyang/software/kentUtils/faToTwoBit /slurm/users/zhouyang/project/human_T2T/05.assembly_comparison/00.data/CHM13.split/chr$i.fasta `pwd`/chr$i/query.2bit && /slurm/users/zhouyang/software/kentUtils/faSize /slurm/users/zhouyang/project/human_T2T/05.assembly_comparison/00.data/MF2_combine.v0.6.split/chr$i.fasta -detailed > `pwd`/chr$i/target.sizes && /slurm/users/zhouyang/software/kentUtils/faSize /slurm/users/zhouyang/project/human_T2T/05.assembly_comparison/00.data/CHM13.split/chr$i.fasta -detailed > `pwd`/chr$i/query.sizes && lastz /slurm/users/zhouyang/project/human_T2T/05.assembly_comparison/00.data/MF2_combine.v0.6.split/chr$i.fasta /slurm/users/zhouyang/project/human_T2T/05.assembly_comparison/00.data/CHM13.split/chr$i.fasta --hspthresh=36400 --format=axt > `pwd`/chr$i/chr$i.axt && /slurm/users/zhouyang/software/kentUtils/axtChain -minScore=5000 -linearGap=/slurm/users/bixupeng/local/pipeline/lastz/medium `pwd`/chr$i/chr$i.axt `pwd`/chr$i/target.2bit `pwd`/chr$i/query.2bit `pwd`/chr$i/chr$i.chain"; done > lastz.shell
+python3 ~/bin/sbatch-submit.py -c 20 --mem 50g -l 1 lastz.shell
+
+~/software/kentUtils/chainMergeSort */*.chain > all.chain
+~/software/kentUtils/chainPreNet all.chain ~/project/human_T2T/05.assembly_comparison/00.data/MF2_combine.v0.6.sizes ~/project/human_T2T/05.assembly_comparison/00.data/chm13v2.0.sizes all_sort.chain
+~/software/kentUtils/chainNet all_sort.chain ~/project/human_T2T/05.assembly_comparison/00.data/MF2_combine.v0.6.sizes ~/project/human_T2T/05.assembly_comparison/00.data/chm13v2.0.sizes temp query.net
+~/software/kentUtils/netSyntenic temp target.net
+~/software/kentUtils/netToAxt target.net all_sort.chain ~/project/human_T2T/05.assembly_comparison/00.data/MF2_combine.v0.6.2bit ~/project/human_T2T/05.assembly_comparison/00.data/chm
+```
+
+
+## from fuqiang lin
+```{bash eval=FALSE, include=TRUE}
+#得到以法老为坐标参考的maf文件
+#预备数据
+faToTwoBit mpha.fa mpha.2bit  
+faToTwoBit dmel.fa dmel.2bit  
+faSize mpha.fa -detailed > mpha.sizes  
+faSize dmel.fa -detailed > dmel.sizes
+
+#lastz本身不支持并行，所以将法老基因组按照染色体切分，手动并行。
+mkdir fa  
+faSplit byName mpha.fa ./fa
+mkdir axt  
+for i in ./fa/*.fa; do prefix=$(basename $i .fa); lastz $i dmel.fa O=400 E=30 K=3000 L=3000 H=2200 T=1 --format=axt --ambiguous=n --ambiguous=iupac > axt/${prefix}.axt; done
+#lastz fa/chr1.fa Cyprinus_carpio.fa O=400 E=30 K=3000 L=3000 H=2200 T=1 --format=axt --ambiguous=n --ambiguous=iupac > axt/chr1.axt
+
+#chaining
+mkdir chain  
+for i in axt/*.axt; do prefix=$(basename $i .axt); axtChain $i mpha.2bit dmel.2bit chain/${prefix}.chain -minScore=3000 -linearGap=medium
+#axtChain axt/chr1.axt Danio_rerio.2bit Cyprinus_carpio.2bit chain/chr1.chain -minScore=3000 -linearGap=medium
+chainMergeSort chain/*.chain > 01.1.all.chain  
+chainPreNet 01.1.all.chain mpha.sizes dmel.sizes 01.2.all.pre.chain
+
+#netting
+chainNet 01.2.all.pre.chain -minSpace=1 mpha.sizes dmel.sizes 02.1.mpha.net 02.2.dmel.net 
+netSyntenic 02.1.mpha.net 03.mpha.noClass.net
+
+#maffing
+netToAxt 03.mpha.noClass.net 01.2.all.pre.chain mpha.2bit dmel.2bit 04.1.out.axt
+axtSort 04.1.out.axt 04.2.mpha.dmel.axt  
+axtToMaf 04.2.mpha.dmel.axt mpha.sizes dmel.sizes 05.mpha.dmel.maf -tPrefix=mpha. -qPrefix=dmel.
+
+
+nohup paralleltask -t slurm -l 1 -m 10 -M 3G -p 10 --job_prefix pl_task task.sh &
+
+良渚我装在这了：/share/home/zhanglab/user/linfuqiang/software/miniconda3/bin/paralleltask
+
+```
+
