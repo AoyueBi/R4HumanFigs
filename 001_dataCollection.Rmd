@@ -35,7 +35,8 @@ library(tidyverse)
 ```{r}
 ### 建立哈希表
 dfhm <- tibble(commonName = c("human","chimpanzee","gorilla","orangutan"),
-               speciesName = c("homo_sapiens","pan_troglodytes","gorilla_gorilla","pongo_abelii"))
+               speciesName = c("homo_sapiens","pan_troglodytes","gorilla_gorilla","pongo_abelii"),
+               abbreName = c("hg38","chim","gori","oran"))
 
 ### 数据处处理
 inputDir <- c("/Users/Aoyue/project_pos/human_ILS/001_data/001_genomeInfo")
@@ -79,71 +80,239 @@ dfcmd <- df %>%
 
 ```
 
-## script test 4 lastz
+## Preparation
+- 教程学习
+ucsc官网教程：
+https://genomewiki.ucsc.edu/index.php/Whole_genome_alignment_howto
+roast 合并序列比对文件参考网址（chenBio的博客）：
+https://www.biochen.org/cn/blog/2021/%E5%A4%9A%E5%9F%BA%E5%9B%A0%E7%BB%84%E6%AF%94%E5%AF%B9/
+multiple whole genome alignment 扇子和杯子：（他给出了很多的学习资源，我在这里学到了很多东西。）
+https://www.jianshu.com/p/be63d73362f5
+
+Problem running TBA for MSA:（这个网站告诉我maf文件要改为 *sing.maf,并且要使用roast，弃用tba）
+https://www.seqanswers.com/forum/bioinformatics/bioinformatics-aa/26371-problem-running-tba-for-msa
+
+kent.git官网的代码：（可以用来学习shell资源）
+https://genome-source.gi.ucsc.edu/gitlist/kent.git/blob/master/src/hg/makeDb/doc/geoFor1.txt
+
+- 注意点： 1.每条染色体建立一个文件夹。2.multiz 和 toast 命令使用的输入文件maf不能压缩，否则报错。
+
+
+- create .2bit and .sizes files
+```{bash eval=FALSE, include=TRUE}
+### 先压缩fa为gz格式： gzip test.fa
+faToTwoBit human_chr21.fa human_chr21.2bit
+faToTwoBit chimpanzee_chr21.fa chimpanzee_chr21.2bit
+faToTwoBit gorilla_chr21.fa gorilla_chr21.2bit
+faToTwoBit orangutan_chr21.fa orangutan_chr21.2bit
+
+faSize -detailed human_chr21.fa human_chr21.sizes
+faSize -detailed chimpanzee_chr21.fa chimpanzee_chr21.sizes
+faSize -detailed gorilla_chr21.fa gorilla_chr21.sizes
+faSize -detailed orangutan_chr21.fa orangutan_chr21.sizes
+
+### 测试：如果去掉./，则echo不能加引号，否则报错，为什么？
+for i in ./*_chr21.fa; do echo $i; done
+for i in ./*_chr21.fa; do echo $i | sed -e s/.\\///; done
+### 测试：修改名字
+for i in *_chr21.fa; do echo $i; `basename $i .fa`.bit; done
+
+### 测试：输出文件的最短名字，不包含文件路径
+for i in 002_refSeq_test/*chr21.fa; do echo $i; done
+for i in 002_refSeq_test/*chr21.fa; do echo `basename $i`; done
+
+### 查看文件名
+for i in *chr21.fa; do echo $i; done
+### 只是打印命令行,后续将命令写入脚本中，注意 >> 是追加的意思
+for i in *chr21.fa; do echo "faSize -detailed $i > `echo $i | sed -e s/.fa/.sizes/`" ; done
+for i in *chr21.fa; do echo "faSize -detailed $i > `echo $i | sed -e s/.fa/.sizes/`" >> sh.sh; done
+### 执行命令行
+for i in *chr21.fa; do faSize -detailed $i > `echo $i | sed -e s/.fa/.sizes/` ; done
+### 查看上述命令执行的结果文件
+for i in *_chr21.sizes; do cat $i; done
+
+```
+
+## script test 4 Alignments with lastz
+
 
 ```{bash eval=FALSE, include=TRUE}
 date && echo ' lastz for human of chr21 begins\n'
 
-lastz human_chr21.fa chimpanzee_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --format=axt --ambiguous=iupac > hg38_21_vs_chim_21.axt
+lastz human_chr21.fa chimpanzee_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --format=axt --ambiguous=iupac --ambiguous=n > hg38_chr21_vs_chim_chr21.axt
 
-lastz human_chr21.fa gorilla_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --format=axt --ambiguous=iupac > hg38_21_vs_gori_21.axt
+lastz human_chr21.fa gorilla_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --format=axt --ambiguous=iupac --ambiguous=n > hg38_chr21_vs_gori_chr21.axt
 
-lastz human_chr21.fa orangutan_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --format=axt --ambiguous=iupac > hg38_21_vs_oran_21.axt
+lastz human_chr21.fa orangutan_chr21.fa --step=19 --hspthresh=2200 --inner=2000 --ydrop=3400 --gappedthresh=10000 --format=axt --ambiguous=iupac --ambiguous=n > hg38_chr21_vs_oran_chr21.axt
 
 date && echo ' lastz for human of chr21 ends \n'
 
 
 ```
 
-## script test 4 axtChain
+## script test 4 Chaining
 ```{bash eval=FALSE, include=TRUE}
 ### 
 
 date && echo ' axtChain for human of chr21 begins\n'
 
-axtChain -minScore=5000 -linearGap=loose hg38_21_vs_chim_21.axt -faT ../human_chr21.fa -faQ ../chimpanzee_chr21.fa  hg38_21_vs_chim_21.chain
+axtChain -minScore=5000 -linearGap=loose hg38_21_vs_chim_21.axt -faT ../human_chr21.fa -faQ ../chimpanzee_chr21.fa  hg38_chr21_vs_chim_chr21.chain
 
-axtChain -minScore=5000 -linearGap=loose hg38_21_vs_gori_21.axt -faT ../human_chr21.fa -faQ ../gorilla_chr21.fa  hg38_21_vs_gori_21.chain
+axtChain -minScore=5000 -linearGap=loose hg38_21_vs_gori_21.axt -faT ../human_chr21.fa -faQ ../gorilla_chr21.fa  hg38_chr21_vs_gori_chr21.chain
 
-axtChain -minScore=5000 -linearGap=loose hg38_21_vs_oran_21.axt -faT ../human_chr21.fa -faQ ../orangutan_chr21.fa  hg38_21_vs_oran_21.chain
+axtChain -minScore=5000 -linearGap=loose hg38_21_vs_oran_21.axt -faT ../human_chr21.fa -faQ ../orangutan_chr21.fa  hg38_chr21_vs_oran_chr21.chain
 
 date && echo ' axtChain for human of chr21 ends \n'
   
 ```
 
-## script test 4 Net
+## script test 4 Netting
 ```{bash eval=FALSE, include=TRUE}
+### chainMergeSort chain/*.chain > all.chain
 ### chainPreNet all.chain ref.size query.size all.sort.chain
 ### chainNet -rescore all.sort.chain ref.size query.size ref.prenet query.prenet -faT ref.fa -faQ query.fa -linearGap=loose 
 ### netSyntenic  ref.prenet ref.net
 
 ### NetFilterNonNested.perl -doScoreFilter -minScore1 50000 -keepSynNetsWithScore 5000 -keepInvNetsWithScore 5000 ca-di.ca.net > ca-di.ca.filter.net
 
-
+### chainPreNet
 date && echo ' chainPreNet for human of chr21 begins\n'
 
-chainPreNet hg38_21_vs_chim_21.chain 46709983 49003045 hg38_21_vs_chim_21.sort.chain
+chainPreNet hg38_chr21_vs_chim_chr21.chain ../human_chr21.sizes ../chimpanzee_chr21.sizes hg38_chr21_vs_chim_chr21.sort.chain
+
+chainPreNet hg38_chr21_vs_gori_chr21.chain ../human_chr21.sizes ../gorilla_chr21.sizes  hg38_chr21_vs_gori_chr21.sort.chain
+
+chainPreNet hg38_chr21_vs_oran_chr21.chain ../human_chr21.sizes ../orangutan_chr21.sizes hg38_chr21_vs_oran_chr21.sort.chain
+
+date && echo ' chainPreNet for human of chr21 ends \n'
+
+
+### chainNet
+chainNet hg38_chr21_vs_chim_chr21.sort.chain ../human_chr21.sizes ../chimpanzee_chr21.sizes hg38_chr21_vs_chim_chr21.prenet chim_chr21.prenet
+
+chainNet hg38_chr21_vs_gori_chr21.sort.chain ../human_chr21.sizes ../gorilla_chr21.sizes hg38_chr21_vs_gori_chr21.prenet gori_chr21.prenet
+
+chainNet hg38_chr21_vs_oran_chr21.sort.chain ../human_chr21.sizes ../orangutan_chr21.sizes hg38_chr21_vs_oran_chr21.prenet  oran_chr21.prenet
+
+
+### netSyntenic
+### 后续只用到taeget的net，因此这步只生成target的net
+netSyntenic hg38_chr21_vs_chim_chr21.prenet hg38_chr21_vs_chim_chr21.syntenic.net
+netSyntenic hg38_chr21_vs_gori_chr21.prenet hg38_chr21_vs_gori_chr21.syntenic.net
+netSyntenic hg38_chr21_vs_oran_chr21.prenet hg38_chr21_vs_oran_chr21.syntenic.net
+
+### netToAxt ref.net 
+netToAxt hg38_chr21_vs_chim_chr21.syntenic.net hg38_chr21_vs_chim_chr21.sort.chain ../human_chr21.2bit ../chimpanzee_chr21.2bit  hg38_chr21_vs_chim_chr21.net.axt 
+
+netToAxt hg38_chr21_vs_gori_chr21.syntenic.net hg38_chr21_vs_gori_chr21.sort.chain ../human_chr21.2bit ../gorilla_chr21.2bit hg38_chr21_vs_gori_chr21.net.axt
+
+netToAxt hg38_chr21_vs_oran_chr21.syntenic.net hg38_chr21_vs_oran_chr21.sort.chain ../human_chr21.2bit ../orangutan_chr21.2bit hg38_chr21_vs_oran_chr21.net.axt
+
+
+### axtSort
+axtSort hg38_chr21_vs_chim_chr21.net.axt hg38_chr21_vs_chim_chr21.sort.net.axt
+
+axtSort hg38_chr21_vs_gori_chr21.net.axt hg38_chr21_vs_gori_chr21.sort.net.axt
+
+axtSort hg38_chr21_vs_oran_chr21.net.axt hg38_chr21_vs_oran_chr21.sort.net.axt
+
 
 date && echo ' axtChain for human of chr21 ends \n'
 
 ```
 
-## script test 4 maf 
+## script test 4 Maffing 
+- !!!!!!注意使用 multiz 命令的时候，maf文件不能压缩！！！
 ```{bash eval=FALSE, include=TRUE}
-
-### netToAxt ref.net 
-
-
-### axtSort
-
-
 ### axtToMaf
+axtToMaf -tPrefix=hg38. -qPrefix=chim. hg38_chr21_vs_chim_chr21.sort.net.axt ../human_chr21.sizes ../chimpanzee_chr21.sizes hg38_chr21_vs_chim_chr21.maf
+
+axtToMaf -tPrefix=hg38. -qPrefix=gori. hg38_chr21_vs_gori_chr21.sort.net.axt ../human_chr21.sizes ../gorilla_chr21.sizes hg38_chr21_vs_gori_chr21.maf
+
+axtToMaf -tPrefix=hg38. -qPrefix=oran. hg38_chr21_vs_oran_chr21.sort.net.axt ../human_chr21.sizes ../orangutan_chr21.sizes hg38_chr21_vs_oran_chr21.maf
+
+### !!!!注意压缩文件
+
+### multiz
+multiz hg38_chr21_vs_chim_chr21.maf.gz hg38_chr21_vs_gori_chr21.maf.gz hg38_chr21_vs_oran_chr21.maf.gz > all.maf
+
+### 创建软连接，重新运行multiz
+ln -s hg38_chr21_vs_chim_chr21.maf hg38.chim.sing.maf
+ln -s hg38_chr21_vs_gori_chr21.maf hg38.gori.sing.maf
+ln -s hg38_chr21_vs_oran_chr21.maf hg38.oran.sing.maf
+
+### 两两合并，多做几次
+multiz hg38.chim.maf.gz hg38.gori.maf.gz 1 > all.maf
+
+multiz hg38.chim.maf hg38.gori.maf 1 > all.maf
+
+multiz hg38_chr21_vs_chim_chr21.maf hg38_chr21_vs_gori_chr21.maf 1 >all.maf
+multiz all.maf hg38_chr21_vs_oran_chr21.maf 1 > final.maf
+
+### tba 方法合并maf文件,舍弃，原因很复杂，包括：1.文件命名问题2.fa文件命名问题
+tba “newick_tree” *.maf tba_out.maf
+tba "(((hg38.NC_000021.9 chim.NC_072419.1) gori.NC_073245.1) oran.NC_072006.1)" *.maf all.maf
+tba "(((hg38. chim.) gori.) oran.)" *.maf all.maf
+tba "(((hg38. chim.) gori.) oran.)" hg38.chim.maf hg38.gori.maf  hg38.oran.maf all.maf
+tba "(((hg38 chim) gori) oran)" hg38.chim.sing.maf hg38.gori.sing.maf  hg38.oran.sing.maf all.maf
+tba "(((hg38 chim) gori) oran)" *.*.maf tba.maf
+
+### roast 方法成功！适合多序列的合并。
+roast - T=`pwd` E=hg38 "(((hg38 chim) gori) oran)" *.*.maf tba.maf > roast.sh
+bash roast.sh
 
 
+### 代码解析
+### 列出所有两两比对的maf文件，定义合并后的总的maf文件
+maf_array=($( ls -d ./analyses/last/net_axt/net_maf/*1to1.maf ))
+combined_maf=./analyses/last/net_axt/net_maf/combined.maf
 
+### 
+cat ${maf_array[@]:0:1} | sed -n '/##maf version=1 scoring=blastz/,$p' > \
+${maf_array[@]:0:1}_tmp
+cat ${maf_array[@]:1:1} | sed -n '/##maf version=1 scoring=blastz/,$p' > \
+${maf_array[@]:1:1}_tmp
+
+multiz ${maf_array[@]:0:1}_tmp ${maf_array[@]:1:1}_tmp 1 > $combined_maf
+
+for maf in ${maf_array[@]:2};
+do
+  echo "processing " $maf
+ cat $maf | sed -n '/##maf version=1 scoring=blastz/,$p' > \
+ "$maf"_tmp
+ multiz $combined_maf "$maf"_tmp 1 > "$combined_maf"_tmp
+ mv "$combined_maf"_tmp $combined_maf
+done
+
+# and filter mafs so all blocks have Zea mays and are at least 20 bp long
+mafFilter -minCol=20 -needComp="$ref_name" $combined_maf > "$combined_maf".filtered
+
+
+### 自己修改脚本进行测试
+maf_array=($( ls -d ./*.maf.gz ))
+combined_maf=./combined.maf
+
+cat ${maf_array[@]:0:1} | sed -n '/##maf version=1 scoring=blastz/,$p' > \
+${maf_array[@]:0:1}_tmp
+cat ${maf_array[@]:1:1} | sed -n '/##maf version=1 scoring=blastz/,$p' > \
+${maf_array[@]:1:1}_tmp
+
+multiz ${maf_array[@]:0:1}_tmp ${maf_array[@]:1:1}_tmp 1 > $combined_maf
+
+for maf in ${maf_array[@]:2};
+do
+  echo "processing " $maf
+ cat $maf | sed -n '/##maf version=1 scoring=blastz/,$p' > \
+ "$maf"_tmp
+ multiz $combined_maf "$maf"_tmp 1 > "$combined_maf"_tmp
+ mv "$combined_maf"_tmp $combined_maf
+done
+
+# and filter mafs so all blocks have Zea mays and are at least 20 bp long
+mafFilter -minCol=20 -needComp="$ref_name" $combined_maf > "$combined_maf".filtered
 ```
 
-### script test 4 MAF
+## script test 4 CoalHMM
 ```{bash eval=FALSE, include=TRUE}
 
 ### multiz M=1 
